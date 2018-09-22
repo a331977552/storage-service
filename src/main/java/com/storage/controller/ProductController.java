@@ -185,13 +185,12 @@ public class ProductController  {
 		return service.getProductByExample(jsonToList2);
 	}
 
-	/*	@ExceptionHandler(value=SizeLimitExceededException.class)
-	@ResponseBody
-	public StorageResult handleException(Exception exception) {
-		System.out.println("handleException22:  "+ exception.getMessage());
-		return StorageResult.failed("file is too large, size cannot exceed 5MB");
-
-	}*/
+	@RequestMapping("/getbestsellingproduct")	
+	public List<Product> getBestSellingProduct(@RequestParam("category") Integer categoryId){
+		
+		return service.getBestSellingProductByCategory(categoryId);
+		
+	}
 
 
 }

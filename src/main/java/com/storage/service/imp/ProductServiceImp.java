@@ -27,10 +27,12 @@ import org.springframework.util.StringUtils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.storage.entity.Category;
 import com.storage.entity.Product;
 import com.storage.entity.ProductDesc;
 import com.storage.entity.Productimg;
+import com.storage.entity.SellingRecord;
 import com.storage.entity.Setting;
 import com.storage.entity.custom.CustomOrder;
 import com.storage.entity.custom.CustomProduct;
@@ -44,6 +46,7 @@ import com.storage.repository.ProductImgRepo;
 import com.storage.repository.ProductRepo;
 import com.storage.repository.specification.ProductSpecification;
 import com.storage.service.ProductService;
+import com.storage.service.SellingRecordService;
 import com.storage.service.SettingService;
 import com.storage.utils.JsonUtils;
 
@@ -63,7 +66,8 @@ public class ProductServiceImp implements ProductService {
 	
 	@Autowired
 	SettingService settingService;
-	
+	@Autowired
+	SellingRecordService SellingRecordService;
 	@Autowired
 	CategoryRepo categoryRepo;
 	@Value("${seaweeddfs.url}")
@@ -512,4 +516,23 @@ public class ProductServiceImp implements ProductService {
 		return StorageResult.succeed(product);
 	}
 
+	@HystrixCommand(fallbackMethod="getBestSellingProductByCategory_fallBack")
+	@Override
+	public List<Product> getBestSellingProductByCategory(Integer categoryId) {
+		List<Product> list=new ArrayList<>();
+		List<SellingRecord> all = SellingRecordService.getAll();
+		for (SellingRecord sellingRecord : all) {
+			Product product = sellingRecord.getProduct();
+			if (product.getCategory()==categoryId) {
+				list.add(product);
+			}
+		}		
+		return list;
+	}
+	
+	public List<Product> getBestSellingProductByCategory_fallBack(Integer categoryId,Throwable throwable) {
+		throwable.printStackTrace();
+		return new ArrayList<Product>();
+	}
+	
 }

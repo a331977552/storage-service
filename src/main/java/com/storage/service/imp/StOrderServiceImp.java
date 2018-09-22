@@ -20,6 +20,7 @@ import com.storage.entity.Customer;
 import com.storage.entity.OrderShipping;
 import com.storage.entity.Orderitem;
 import com.storage.entity.Product;
+import com.storage.entity.SellingRecord;
 import com.storage.entity.Setting;
 import com.storage.entity.StOrder;
 import com.storage.entity.custom.CustomProduct;
@@ -30,6 +31,7 @@ import com.storage.repository.OrderItemRepo;
 import com.storage.repository.OrderRepo;
 import com.storage.repository.OrderShippingRepo;
 import com.storage.repository.ProductRepo;
+import com.storage.service.SellingRecordService;
 import com.storage.service.SettingService;
 import com.storage.service.StOrderService;
 import com.storage.utils.IDUtils;
@@ -47,6 +49,10 @@ public class StOrderServiceImp implements StOrderService {
 	OrderShippingRepo orderShippingRepo;
 	@Autowired
 	SettingService settingService;
+	@Autowired
+	SellingRecordService sellingRecordService;
+	
+	
 	@Autowired
 	EntityManager manager;
 
@@ -148,17 +154,20 @@ public class StOrderServiceImp implements StOrderService {
 
 		Integer orderId = save.getId();
 		List<CustomProduct> list = result.getList();
-
+		
 		for (CustomProduct customProduct : list) {
+			
+			//creating order item
 			Orderitem item = new Orderitem();
 			item.setOrderid(orderId);
 			item.setProductName(customProduct.getProduct().getName());
-
 			item.setProductid(customProduct.getProduct().getId());
 			item.setQuantity(customProduct.getQty());
 			item.setTotalprice(((Double) (customProduct.getSubtotal() * 100)).intValue());
 			item.setUnitprice(customProduct.getProduct().getSellingprice());
 			orderItemRepo.save(item);
+			
+			//alter quantity of the product
 			Product one = productRepo.getOne(customProduct.getProduct().getId());
 			if (one.getQuantity() - customProduct.getQty() < 0) {
 				TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
@@ -168,7 +177,21 @@ public class StOrderServiceImp implements StOrderService {
 			} else {
 				one.setQuantity(one.getQuantity() - customProduct.getQty());
 			}
-			productRepo.save(one);
+			Product save2 = productRepo.save(one);
+			
+			//adding record
+			Optional<SellingRecord> sellingRecodByProductId = sellingRecordService.getSellingRecodByProductId(save2.getId());
+			SellingRecord sellingRecord;
+			if(sellingRecodByProductId.isPresent()) {
+				 sellingRecord = sellingRecodByProductId.get();
+				sellingRecord.setSellingAmount(sellingRecord.getSellingAmount()+customProduct.getQty());
+			}else {
+				sellingRecord=new SellingRecord();
+				sellingRecord.setProduct(save2);
+				sellingRecord.setSellingAmount(customProduct.getQty());
+				sellingRecord.setSellingAmount(0);
+			}
+			sellingRecordService.addOrUpdateSellingRecord(sellingRecord);
 		}
 	
 		
