@@ -16,9 +16,18 @@ public class FeedBackServiceImp  implements FeedBackService{
 	@Autowired
 	FeedBackRepo repo;
 
+
+	@HystrixCommand(fallbackMethod="addOrUpdate_error")
 	@Override
-	public FeedBack addOrUpdate(FeedBack back) {
-		return repo.save(back);
+	public Optional<FeedBack> addOrUpdate(FeedBack back) {
+		FeedBack save = repo.save(back);
+		
+		return Optional.of(save);
+	}
+	
+	public Optional<FeedBack> addOrUpdate_error(FeedBack back,Throwable e) {
+		e.printStackTrace();
+		return Optional.empty();
 	}
 
 	@Override

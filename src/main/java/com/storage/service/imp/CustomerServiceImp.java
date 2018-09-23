@@ -58,8 +58,19 @@ public class CustomerServiceImp implements CustomerService {
 	public StorageResult updateCustomer(Customer customer) {
 		if (customer == null || customer.getId() == null || customer.getId() < 0)
 			return StorageResult.failed("invalid parameter ");
-
-		customerRepo.save(customer);
+		Customer one = customerRepo.getOne(customer.getId());
+		if(!StringUtils.isEmpty(customer.getAddress()))
+		one.setAddress(customer.getAddress());
+		if(!StringUtils.isEmpty(customer.getName()))
+			one.setName(customer.getName());
+		if(!StringUtils.isEmpty(customer.getEmail()))
+			one.setEmail(customer.getEmail());
+		if(!StringUtils.isEmpty(customer.getPostcode()))
+			one.setPostcode(customer.getPostcode());
+		if(!StringUtils.isEmpty(customer.getPhone()))
+			one.setPhone(customer.getPhone());
+		
+		customerRepo.save(one);
 
 		return StorageResult.succeed();
 	}

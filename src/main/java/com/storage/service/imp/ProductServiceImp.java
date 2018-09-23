@@ -520,13 +520,44 @@ public class ProductServiceImp implements ProductService {
 	@Override
 	public List<Product> getBestSellingProductByCategory(Integer categoryId) {
 		List<Product> list=new ArrayList<>();
+		
+		//get desired products according to the categoryid
 		List<SellingRecord> all = SellingRecordService.getAll();
 		for (SellingRecord sellingRecord : all) {
 			Product product = sellingRecord.getProduct();
-			if (product.getCategory()==categoryId) {
+			if (product.getCategory()==categoryId && product.getStatus()==PRODUCT_NORNAL) {
 				list.add(product);
+			if(list.size()>=10)
+				break;
 			}
-		}		
+			
+		}
+		//get best selling products that is not in the the productId
+		if(list.size()<10) {
+			for (SellingRecord sellingRecord : all) {
+				Product product = sellingRecord.getProduct();
+				if (product.getCategory()!=categoryId  && product.getStatus()==PRODUCT_NORNAL) {
+					list.add(product);
+				if(list.size()>=10)
+					break;
+				}				
+			}			
+		}
+		//fill the list with new added products
+		if(list.size()<10) {
+			Product probe=new Product();
+			probe.setCategory(categoryId);
+			probe.setStatus(PRODUCT_NORNAL);
+			Sort ascending = Sort.by("createdtime").descending();
+			
+			List<Product> findAll = productRepo.findAll(Example.of(probe),ascending);
+			for (Product product : findAll) {
+				list.add(product);
+				if(list.size()>=10)
+					break;
+				}				
+			}
+		
 		return list;
 	}
 	

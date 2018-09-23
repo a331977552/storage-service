@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Example;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
@@ -23,7 +24,6 @@ public class SellingRecordServiceImp implements SellingRecordService {
 	@Override
 	public SellingRecord addOrUpdateSellingRecord(SellingRecord record) {
 		SellingRecord result = repo.save(record);
-
 		//TODO solve problem and add recommended products
 		if (false) {
 			Optional<SellingRecord> findById = repo.findById(record.getId());
@@ -69,8 +69,11 @@ public class SellingRecordServiceImp implements SellingRecordService {
 
 	@Override
 	public List<SellingRecord> getAll() {
-
-		return repo.findAll();
+		
+		Sort sort=Sort.by("sellingAmount").descending();
+		List<SellingRecord> findAll = repo.findAll(sort);
+	
+		return findAll;
 	}
 
 }

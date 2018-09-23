@@ -85,6 +85,11 @@ public class StOrderController   {
 		Customer customer = result.getCustomer();
 		return this.service.creaOrder(customer, result);
 	}
-
+	@RequestMapping("/findAllOrderByUserid/{userId}")
+	public  Object findAllOrderByUserId(@PathVariable("userId")Integer id){
+		
+		return service.findAllTableItemsByUserId(id);
+		
+	}
 
 }

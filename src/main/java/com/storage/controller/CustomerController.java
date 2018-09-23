@@ -82,7 +82,7 @@ public class CustomerController  {
 	 */
 	
 	@PostMapping("/update")
-	public Object updateCustomer(Customer customer) {
+	public Object updateCustomer(@RequestBody Customer customer) {
 		return this.service.updateCustomer(customer);
 	}
 	/* (non-Javadoc)

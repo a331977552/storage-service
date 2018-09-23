@@ -189,7 +189,7 @@ public class StOrderServiceImp implements StOrderService {
 				sellingRecord=new SellingRecord();
 				sellingRecord.setProduct(save2);
 				sellingRecord.setSellingAmount(customProduct.getQty());
-				sellingRecord.setSellingAmount(0);
+				sellingRecord.setReturnedAmount(0);
 			}
 			sellingRecordService.addOrUpdateSellingRecord(sellingRecord);
 		}
@@ -331,6 +331,36 @@ public class StOrderServiceImp implements StOrderService {
 		orderWrap.setMsg("unknow error");
 		e.printStackTrace();
 		return  orderWrap;
+	}
+
+
+	@HystrixCommand(fallbackMethod = "findAllTableItemsByUserId_error")
+	@Override
+	public StorageResult<List<OrderTableItem>> findAllTableItemsByUserId(Integer Id) {
+		List<OrderTableItem> items = new ArrayList<>();
+		StOrder probe=new StOrder();
+		probe.setCustomerid(Id);
+		List<StOrder> findAll = orderRepo.findAll(Example.of(probe));
+		for (StOrder order : findAll) {
+			OrderShipping example = new OrderShipping();
+			example.setOrderId(order.getId());			
+			OrderTableItem item = new OrderTableItem();
+			item.setId(order.getId());
+			item.setOrderNumber(order.getOrdernumber());
+			item.setCreatedTime(order.getCreatedtime());
+			item.setPrice(order.getTotalprice());
+			item.setStatus(order.getStatus());
+			item.setName(order.getBuyername());
+			items.add(item);		
+		}
+
+
+		return StorageResult.succeed(items);
+	}
+	public StorageResult<List<OrderTableItem>> findAllTableItemsByUserId_error(Integer Id,Throwable e) {
+	
+		e.printStackTrace();
+		return StorageResult.failed("error to retrive all order info");
 	}
 
 }
