@@ -57,9 +57,9 @@ public class ProductController  {
 	
 	@GetMapping("/get/{id}")
 	public Object getProduct(@PathVariable(name = "id") Integer id) {
-			StorageResult productById = this.service.getProductById(id);
+			StorageResult<CustomProduct> productById = this.service.getProductById(id);
 		
-			CustomProduct result = (CustomProduct) productById.getResult();
+			CustomProduct result =productById.getResult();
 			ProductDetail model=new ProductDetail();
 			model.setProduct(result.getProduct());
 			model.setImgs(result.getImgs());

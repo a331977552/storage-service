@@ -45,27 +45,8 @@ public class ProductSpecification {
 		};
 	}
 
-	public static Specification<Product> buyingPriceEqual(Integer buyingPrice) {
+	
 
-		return (root, query, criteriaBuilder) -> {
-			if (buyingPrice == null || buyingPrice < 0)
-				return null;
-			else {
-				return criteriaBuilder.equal(root.get("buyingPrice"), buyingPrice);
-			}
-		};
-	}
-
-	public static Specification<Product> sellingpriceEqual(Integer sellingprice) {
-
-		return (root, query, criteriaBuilder) -> {
-			if (sellingprice == null || sellingprice < 0)
-				return null;
-			else {
-				return criteriaBuilder.equal(root.get("sellingprice"), sellingprice);
-			}
-		};
-	}
 
 	public static Specification<Product> createdtimeEqual(Date createdtime) {
 

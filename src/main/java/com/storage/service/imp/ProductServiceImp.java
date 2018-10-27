@@ -1,7 +1,6 @@
 package com.storage.service.imp;
 
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -59,6 +58,13 @@ import lombok.extern.slf4j.Slf4j;
 public class ProductServiceImp implements ProductService {
 	private static final Integer PRODUCT_DELETE = 1;
 	private static final Integer PRODUCT_NORNAL = 2;
+	
+	private static final Integer POUND = 1;
+	private static final Integer RMB = 2;
+	private static final String RMB_SYMBOL="¥";
+	private static final String POUND_SYMBOL="£";
+	
+	
 	@Autowired
 	ProductRepo productRepo;
 	@Autowired
@@ -114,12 +120,12 @@ public class ProductServiceImp implements ProductService {
 
 	@Override
 	public StorageResult updateProduct(Product product) {
-		if (product == null || product.getId() == null || product.getId() < 0)
+	/*	if (product == null || product.getId() == null || product.getId() < 0)
 			return StorageResult.failed("invalid parameter ");
 
 		this.productRepo.save(product);
-
-		return StorageResult.succeed();
+*/
+		return StorageResult.failed();
 	}
 
 	@Override
@@ -150,13 +156,21 @@ public class ProductServiceImp implements ProductService {
 			return StorageResult.failed("no such product");
 		}
 		Product product = pro.get();
-		BigDecimal valueOf = BigDecimal.valueOf(100);
-
-		BigDecimal sell = BigDecimal.valueOf(product.getSellingprice()).divide(valueOf);
-
-		BigDecimal buy = BigDecimal.valueOf(product.getBuyingprice()).divide(valueOf);
-		product.setSellingprice_(sell.floatValue());
-		product.setBuyingprice_(buy.floatValue());
+		manager.detach(product);
+		
+		product.setSellingprice_(product.getSellingprice());
+		product.setBuyingprice_(product.getBuyingprice());
+		Setting setting = settingService.getSetting().getResult();
+		
+		if(setting.getCurrencyDisplay()==1) {
+			product.setMoneyDisplayed("£"+product.getSellingprice_aftertax().toPlainString());			
+		}else {			
+			product.setMoneyDisplayed("¥"+(product.getSellingprice_aftertax().multiply(new BigDecimal(setting.getCurrencyRate()))).toPlainString());			
+			product.setSellingprice_aftertax(product.getSellingprice_aftertax().multiply(new BigDecimal(setting.getCurrencyRate())));
+		}
+		
+		
+		
 		customProduct.setProduct(product);
 		Productimg probe = new Productimg();
 		probe.setProdcutid(product.getId());
@@ -212,7 +226,7 @@ public class ProductServiceImp implements ProductService {
 		if (product.getBuyingprice_() == null)
 			return StorageResult.failed("buying price is empty");
 		else {
-			product.setBuyingprice((int) (product.getBuyingprice_() * 100));
+			product.setBuyingprice(product.getBuyingprice_());
 		}
 		if (product.getVat() == null) {
 			product.setVat(0.0f);
@@ -221,11 +235,10 @@ public class ProductServiceImp implements ProductService {
 			return StorageResult.failed("selling price is empty");
 		else {
 			Float vat = cusproduct.getProduct().getVat();
-			BigDecimal bigDecimal=new BigDecimal(vat);
-			BigDecimal divide = bigDecimal.divide(new BigDecimal("100"));
-			float floatValue = divide.floatValue();			
-			int finalPrice= (int)((product.getSellingprice_() * 100)*(1+floatValue));
-			product.setSellingprice(finalPrice);
+			BigDecimal divide=new  BigDecimal(vat).divide(new BigDecimal(100));
+			BigDecimal multiply = product.getSellingprice_().multiply(new BigDecimal(1+divide.floatValue()));			
+			product.setSellingprice_aftertax(multiply);
+			product.setSellingprice(product.getSellingprice_());
 		}
 		if (product.getQuantity_() == null) {
 			product.setQuantity(0);
@@ -278,13 +291,11 @@ public class ProductServiceImp implements ProductService {
 		}
 
 		Specification<Product> and = Specification.where(ProductSpecification.idEqual(product.getId()))
-				.and(ProductSpecification.buyingPriceEqual(product.getBuyingprice()))
-
+				
 				.and(ProductSpecification.categoryEqual(product.getCategory()))
 				.and(ProductSpecification.createdtimeEqual(product.getCreatedtime()))
 				.and(ProductSpecification.nameLike(product.getName()))
 				.and(ProductSpecification.quantityEqual(product.getQuantity()))
-				.and(ProductSpecification.sellingpriceEqual(product.getSellingprice()))
 				.and(ProductSpecification.supplierEqual(product.getSupplier()))
 				.and(ProductSpecification.updatetimeEqual(product.getUpdatetime()))
 				.and(ProductSpecification.vatEqual(product.getId()))
@@ -317,8 +328,8 @@ public class ProductServiceImp implements ProductService {
 		if (results.size() == 0 && !com.storage.utils.StringUtils.isEmpty(product.getName())) {
 			Product example = new Product();
 			example.setBarcode(product.getName());
-			example.setStatus(1);
-			Example.of(example);
+			example.setStatus(PRODUCT_NORNAL);
+
 			results = this.productRepo.findAll(Example.of(example));
 		}
 		Iterator<Product> iterator = results.iterator();
@@ -335,7 +346,13 @@ public class ProductServiceImp implements ProductService {
 			Product product2 = iterator.next();
 			product2.setProduct_warning_quantity(this.product_warning_quantity);
 			Productimg example2 = new Productimg();
-			product2.setSellingprice((int)(currencyRate*product2.getSellingprice()));
+			if(setting.getCurrencyDisplay()==RMB) {
+				product2.setSellingprice_aftertax(product2.getSellingprice_aftertax().multiply(new BigDecimal(currencyRate)));				
+				product2.setMoneyDisplayed("¥"+product2.getSellingprice_aftertax());
+			}else {				
+				product2.setMoneyDisplayed("£"+product2.getSellingprice_aftertax());
+			}
+			
 			example2.setProdcutid(product2.getId());
 			List<Productimg> selectByExample = this.productimgRepo.findAll(Example.of(example2));
 			if (selectByExample.size() > 0) {
@@ -386,13 +403,13 @@ public class ProductServiceImp implements ProductService {
 	}
 
 	@Override
-	public StorageResult getProductByExample(List<CustomOrder> jsonToList) {
+	public StorageResult<OrderWrap> getProductByExample(List<CustomOrder> jsonToList) {
 		List<CustomProduct> list = new ArrayList<>();
 		OrderWrap orderWrap = new OrderWrap();
-		double totalPrice = 0;
-		NumberFormat numberInstance = new DecimalFormat("0.00");
-
-		numberInstance.setMaximumFractionDigits(2);
+		BigDecimal totalPrice=new BigDecimal(0);
+		Setting setting = settingService.getSetting().getResult();
+		Float currencyRate = setting.getCurrencyRate();
+		
 		if (jsonToList == null)
 			return StorageResult.failed("Repeat submission");
 		for (CustomOrder customOrder : jsonToList) {
@@ -404,16 +421,32 @@ public class ProductServiceImp implements ProductService {
 				CustomProduct customProduct = new CustomProduct();
 				customProduct.setProduct(product.get());
 				customProduct.setQty(customOrder.getQty());
-				Integer sellingprice = product.get().getSellingprice();
-				double subtotal = (double) (sellingprice * customOrder.getQty()) / 100;
-				Double valueOf = Double.valueOf(numberInstance.format(subtotal));
-				totalPrice += valueOf;
-				customProduct.setSubtotal(valueOf);
+				BigDecimal sellingprice = product.get().getSellingprice_aftertax();
+				BigDecimal subtotal =sellingprice.multiply(new BigDecimal(customOrder.getQty()));
+				totalPrice=totalPrice.add(subtotal);
+				
+				customProduct.setSubtotal(subtotal);
+				if(setting.getCurrencyDisplay()==1) {
+					customProduct.setSubtotal(subtotal);
+					customProduct.setSubtotalDisplayed("£"+totalPrice);
+				}else {
+					customProduct.setSubtotal(subtotal.multiply(new BigDecimal(currencyRate)));
+					customProduct.setSubtotalDisplayed("¥"+customProduct.getSubtotal().toPlainString());
+				}
+				
 				list.add(customProduct);
 			}
 		}
 		orderWrap.setList(list);
-		orderWrap.setTotalPrice(Double.valueOf(numberInstance.format(totalPrice)));
+		if(setting.getCurrencyDisplay()==1) {
+			orderWrap.setTotalPrice(totalPrice);
+			orderWrap.setTotalPriceDisplay("£"+totalPrice);
+		}else {
+			orderWrap.setTotalPrice(totalPrice.multiply(new BigDecimal(currencyRate)));
+			orderWrap.setTotalPriceDisplay("¥"+orderWrap.getTotalPrice().toPlainString());
+		}
+		
+		
 		return StorageResult.succeed(orderWrap);
 	}
 
@@ -429,6 +462,7 @@ public class ProductServiceImp implements ProductService {
 			return StorageResult.failed("didnot find the item");
 	
 		StorageResult<Setting> settingresult = settingService.getSetting();
+		
 		if(!settingresult.isSuccess())
 		{
 			log.error("cannot find setting ");
@@ -438,7 +472,15 @@ public class ProductServiceImp implements ProductService {
 		Product product2 = selectByExample.get(0);
 		manager.detach(product2);
 		
-		product2.setSellingprice((int)(product2.getSellingprice()*currencyRate));
+		Integer currencyDisplay = settingresult.getResult().getCurrencyDisplay();
+		if(currencyDisplay==POUND) {
+			
+			product2.setMoneyDisplayed(POUND_SYMBOL+product2.getSellingprice_aftertax());
+		}else {
+			product2.setSellingprice_aftertax(product2.getSellingprice_aftertax().multiply(new BigDecimal(currencyRate)));
+			product2.setMoneyDisplayed(RMB_SYMBOL+product2.getSellingprice_aftertax());
+
+		}
 		return StorageResult.succeed(product2);
 	}
 
@@ -458,16 +500,19 @@ public class ProductServiceImp implements ProductService {
 		if (cusproduct == null || cusproduct.getProduct() == null)
 			return StorageResult.failed("product required");
 		Product product = cusproduct.getProduct();
-		
+		if (product.getVat() == null) {
+			product.setVat(0.0f);
+		}
 		Float vat = cusproduct.getProduct().getVat();
 		BigDecimal bigDecimal=new BigDecimal(vat);
 		BigDecimal divide = bigDecimal.divide(new BigDecimal("100"));
 		float floatValue = divide.floatValue();			
-		int finalPrice= (int)((product.getSellingprice_() * 100)*(1+floatValue));
-		product.setSellingprice(finalPrice);
+		product.setSellingprice(product.getSellingprice_());
+		BigDecimal multiply = product.getSellingprice_().multiply(new BigDecimal(1+floatValue));		
+		product.setSellingprice_aftertax(multiply);
 		
 		
-		product.setBuyingprice((int) (product.getBuyingprice_() * 100));
+		product.setBuyingprice(product.getBuyingprice_());
 
 		if (product.getQuantity_() == null) {
 			product.setQuantity(0);
@@ -476,9 +521,7 @@ public class ProductServiceImp implements ProductService {
 			product.setQuantity(quantity_.intValue());
 		}
 
-		if (product.getVat() == null) {
-			product.setVat(0.0f);
-		}
+		
 
 		product.setUpdatetime(new Date());
 		Product one = productRepo.getOne(product.getId());

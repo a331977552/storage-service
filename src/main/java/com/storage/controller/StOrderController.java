@@ -10,13 +10,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.storage.entity.Customer;
 import com.storage.entity.StOrder;
+import com.storage.entity.custom.OrderStatis;
 import com.storage.entity.custom.OrderTableItem;
 import com.storage.entity.custom.OrderWrap;
 import com.storage.service.StOrderService;
 
 @RestController()
 @RequestMapping("/stOrder")
-public class StOrderController   {
+public class    StOrderController{
 
 	@Autowired
 	StOrderService service;
@@ -91,5 +92,12 @@ public class StOrderController   {
 		return service.findAllTableItemsByUserId(id);
 		
 	}
-
+	
+	@RequestMapping("/getStatistics")
+	public  Object getStatistics(){
+		
+		OrderStatis statistics = service.getStatistics();
+		return statistics;
+		
+	}
 }

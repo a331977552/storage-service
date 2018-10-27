@@ -84,8 +84,14 @@ public class SettingServiceImp implements  SettingService{
 		
 		List<Setting> findAll = settingRepo.findAll();
 		if(findAll.isEmpty())
-			return StorageResult.failed("no setting yet!");
-		
+		{
+			Setting entity=new Setting();
+			entity.setCurrencyDisplay(1);
+			entity.setCurrencyRate(9.f);
+			
+			Setting save = settingRepo.save(entity);
+			return StorageResult.succeed(save);
+		}
 		return StorageResult.succeed(findAll.get(0));
 		
 	}
