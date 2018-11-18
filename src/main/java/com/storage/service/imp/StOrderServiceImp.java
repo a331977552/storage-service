@@ -71,6 +71,8 @@ public class StOrderServiceImp implements StOrderService {
 	private static final int DISPATCHED = 3;
 	private static final int FINISHED = 4;
 	private static final int CLOSED = 5;
+	private static final int CANCELED = 6;
+	
 	@Resource(name = "redisTemplate")
 	ValueOperations<String, String> opsForValue;
 	private static final String ORDER_STATISTICS_NAME="orderStatistics";
@@ -291,6 +293,31 @@ public class StOrderServiceImp implements StOrderService {
 		one.setStatus(stOrder.getStatus());
 		one.setUpdatetime(new Date());
 		StOrder save = this.orderRepo.save(one);
+		/**
+		 * if it is canceld state, the quantity should be returned to the product
+		 */
+		if(one.getStatus()==CANCELED) {
+			Orderitem probe=new Orderitem();
+			probe.setOrderid(one.getId());
+			Example<Orderitem> of = Example.of(probe);
+			
+			List<Orderitem> findAll = orderItemRepo.findAll(of);
+			for (Orderitem orderitem : findAll) {
+				Integer productid = orderitem.getProductid();
+				Product example=new Product();
+				example.setId(productid);
+				
+				Optional<Product> one2 = productRepo.findOne(Example.of(example));
+				if(one2.isPresent()) {
+					Product product = one2.get();
+					product.setQuantity(product.getQuantity()+orderitem.getQuantity());
+					productRepo.save(product);
+				}
+				
+			}
+				
+		}
+		
 		return StorageResult.succeed();
 	}
 
@@ -335,8 +362,9 @@ public class StOrderServiceImp implements StOrderService {
 				Product product = new Product();
 				product.setId(null);
 				product.setName(orderitem.getProductName() + "(deleted)");
-				product.setTitle("");
+				product.setPromotionTitle("");
 				e.setProduct(product);
+				
 			} else {
 				Product product = findById.get();
 				e.setProduct(product);
@@ -476,6 +504,11 @@ public class StOrderServiceImp implements StOrderService {
 		example = Example.of(probe);
 		long closed = orderRepo.count(example);
 		orderStatis.setClosed(closed);
+		
+		probe.setStatus(CANCELED);
+		example = Example.of(probe);
+		long cancel = orderRepo.count(example);
+		orderStatis.setCanceled(cancel);
 		try {
 			opsForValue.set(ORDER_STATISTICS_NAME, mapper.writeValueAsString(orderStatis));
 		} catch (JsonProcessingException e) {

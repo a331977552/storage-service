@@ -228,6 +228,11 @@ public class ProductServiceImp implements ProductService {
 		else {
 			product.setBuyingprice(product.getBuyingprice_());
 		}
+		
+	
+		
+		
+		
 		if (product.getVat() == null) {
 			product.setVat(0.0f);
 		}
@@ -240,6 +245,11 @@ public class ProductServiceImp implements ProductService {
 			product.setSellingprice_aftertax(multiply);
 			product.setSellingprice(product.getSellingprice_());
 		}
+		if(product.getSellingprice_old_()!=null) {
+			product.setSellingprice_old(product.getSellingprice_old_());
+		}
+
+		
 		if (product.getQuantity_() == null) {
 			product.setQuantity(0);
 		} else {
@@ -348,9 +358,13 @@ public class ProductServiceImp implements ProductService {
 			Productimg example2 = new Productimg();
 			if(setting.getCurrencyDisplay()==RMB) {
 				product2.setSellingprice_aftertax(product2.getSellingprice_aftertax().multiply(new BigDecimal(currencyRate)));				
-				product2.setMoneyDisplayed("¥"+product2.getSellingprice_aftertax());
+				product2.setMoneyDisplayed("¥"+product2.getSellingprice_aftertax());				
+				if(product2.getSellingprice_old()!=null)
+				product2.setOldMoneyDisplayed("¥"+product2.getSellingprice_old().multiply(new BigDecimal(currencyRate)));
 			}else {				
 				product2.setMoneyDisplayed("£"+product2.getSellingprice_aftertax());
+				if(product2.getSellingprice_old()!=null)
+				product2.setOldMoneyDisplayed("£"+product2.getSellingprice_old());
 			}
 			
 			example2.setProdcutid(product2.getId());
@@ -511,7 +525,15 @@ public class ProductServiceImp implements ProductService {
 		BigDecimal multiply = product.getSellingprice_().multiply(new BigDecimal(1+floatValue));		
 		product.setSellingprice_aftertax(multiply);
 		
-		
+		BigDecimal sellingprice_old_ = cusproduct.getProduct().getSellingprice_old_();
+		if(sellingprice_old_!=null && sellingprice_old_.floatValue()>0.01)
+		{
+			product.setSellingprice_old(sellingprice_old_);
+		}else
+		{
+			product.setSellingprice_old(null);
+
+		}
 		product.setBuyingprice(product.getBuyingprice_());
 
 		if (product.getQuantity_() == null) {
