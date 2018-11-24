@@ -75,7 +75,7 @@ public class SettingServiceImp implements  SettingService{
 	}
 
 	@Override
-	public StorageResult count(){
+	public StorageResult<Long> count(){
 		long count = this.settingRepo.count();
 		return  StorageResult.succeed(count);
 	}

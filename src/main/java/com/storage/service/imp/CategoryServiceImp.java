@@ -1,4 +1,5 @@
 package com.storage.service.imp;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -9,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Example;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import com.storage.entity.Category;
 import com.storage.entity.Product;
@@ -16,7 +18,7 @@ import com.storage.entity.custom.StorageResult;
 import com.storage.repository.CategoryRepo;
 import com.storage.repository.ProductRepo;
 import com.storage.service.CategoryService;
-import com.storage.utils.JsonUtils;
+import com.storage.service.ProductService;
 import com.storage.utils.StringUtils;
 
 
@@ -37,7 +39,7 @@ public class CategoryServiceImp implements  CategoryService{
 		if(category==null) {
 			return StorageResult.failed("invalid parameter");
 		}
-		if(StringUtils.isEmpty(category.getName())) {
+		if(StringUtils.isEmpty(category.getText())) {
 			return StorageResult.failed("name required!");
 		}
 		
@@ -51,7 +53,7 @@ public class CategoryServiceImp implements  CategoryService{
 		if(category==null ||category.getId()==null ||category.getId()<0) {
 			return StorageResult.failed("invalid parameter ");
 		}
-		if(StringUtils.isEmpty(category.getName())) {
+		if(StringUtils.isEmpty(category.getText())) {
 			return StorageResult.failed("required!");
 		}
 		
@@ -93,18 +95,11 @@ public class CategoryServiceImp implements  CategoryService{
 	public StorageResult<List<Category>> getCategoryByExample(Category  category ){
 
 		
-		String string = jedisPool.get(REDIS_CACHE);
-		
-		if(!StringUtils.isEmpty(string)) {
-			return StorageResult.succeed(JsonUtils.jsonToList(string,Category.class));
-		}
-
-		
 
 		Example<Category> of = Example.of(category);
 		
 		List<Category> results = this.categoryRepo.findAll(of);
-		jedisPool.set(REDIS_CACHE,JsonUtils.objectToJson(results));
+	
 	
 		return StorageResult.succeed(results);
 	}
@@ -143,8 +138,54 @@ public class CategoryServiceImp implements  CategoryService{
 		return  StorageResult.succeed(count);
 	}
 	@Override
-	public StorageResult<List<Category>> findAll() {
-		return StorageResult.succeed(categoryRepo.findAll());
+	public List<Category> findAll() {
+		return categoryRepo.findAll();
+	}
+	
+	/**
+	 * 
+	 * delete all  that should be deleted,
+	 * and update all existing, and
+	 *  add all that are not existed before.
+	 * 
+	 */
+	@Override
+	public StorageResult updateCategories(List<Category> categories) {
+		List<Category> findAll = categoryRepo.findAll();
+		List<Category> deletes=new ArrayList<>();
+		for (Category category : findAll) {
+			boolean delete=true;
+			inner :for (Category cat : categories) {
+				if(cat.getId()==category.getId()) {
+					delete=false;
+					break inner;
+				}
+			}
+			if(delete) {
+				deletes.add(category);
+			}			
+		}
+		
+
+		for (Category category : deletes) {
+			Product product=new Product();
+			product.setCategory(category.getId());
+			product.setStatus(ProductService.PRODUCT_NORNAL);
+			Example<Product> create =Example.of(product);
+
+			boolean existProduct = this.productRepo.exists(create);
+			
+			if(existProduct) {
+				TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+				return StorageResult.failed("当前目录下有产品,无法删除: "+category.getText());				
+			}
+			categoryRepo.deleteById(category.getId());
+		}
+		
+		jedisPool.getOperations().expire(REDIS_CACHE, 0,TimeUnit.SECONDS);
+		List<Category> saveAll = categoryRepo.saveAll(categories);
+		
+		return StorageResult.succeed(saveAll);
 	}
 
 

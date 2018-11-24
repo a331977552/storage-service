@@ -56,8 +56,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @org.springframework.transaction.annotation.Transactional
 public class ProductServiceImp implements ProductService {
-	private static final Integer PRODUCT_DELETE = 1;
-	private static final Integer PRODUCT_NORNAL = 2;
+
 	
 	private static final Integer POUND = 1;
 	private static final Integer RMB = 2;
@@ -228,8 +227,8 @@ public class ProductServiceImp implements ProductService {
 		else {
 			product.setBuyingprice(product.getBuyingprice_());
 		}
-		
-	
+		if(product.getCategory()==null)
+			return StorageResult.failed("category is empty");
 		
 		
 		

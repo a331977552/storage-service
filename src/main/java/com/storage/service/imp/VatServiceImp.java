@@ -82,7 +82,7 @@ public class VatServiceImp implements  VatService{
 	}
 
 	@Override
-	public StorageResult count(){
+	public StorageResult<Long> count(){
 		long count = this.vatRepo.count();
 		return  StorageResult.succeed(count);
 	}

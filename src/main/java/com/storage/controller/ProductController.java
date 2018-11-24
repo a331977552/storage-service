@@ -63,11 +63,11 @@ public class ProductController  {
 			ProductDetail model=new ProductDetail();
 			model.setProduct(result.getProduct());
 			model.setImgs(result.getImgs());
-			Category category=new Category();
-			StorageResult<List<Category>> categoryByExample = this.categoryService.getCategoryByExample(category);
+			Integer categoryId = result.getProduct().getCategory();
+			StorageResult<Category> categoryById = categoryService.getCategoryById(categoryId);
 			StorageResult<List<Vat>> vatByExample = vatService.getVatByExample(new Vat());
 			
-			model.setCategories(categoryByExample.getResult());
+			model.setCategory(categoryById.getResult());
 			model.setVats(vatByExample.getResult());
 			return model;
 	}

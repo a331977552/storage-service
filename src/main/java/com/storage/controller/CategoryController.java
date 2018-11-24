@@ -1,5 +1,7 @@
 package com.storage.controller;
 
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,7 +72,12 @@ public class CategoryController {
 	
 		return this.service.updateCategory(category);
 	}
-
+	@PostMapping("/updateAll")
+	public Object updateAllCategory(@RequestBody List<Category> categories) {
+	
+		System.out.println(categories);
+		return this.service.updateCategories(categories);
+	}
 	/* (non-Javadoc)
 	 * @see com.storage.controller.ICategoryController#count()
 	 */
