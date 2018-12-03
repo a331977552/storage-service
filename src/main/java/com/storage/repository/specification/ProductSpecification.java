@@ -2,7 +2,10 @@ package com.storage.repository.specification;
 
 import java.util.Date;
 
+import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
 
 import org.springframework.data.jpa.domain.Specification;
 
@@ -16,11 +19,26 @@ public class ProductSpecification {
 		return (root, query, criteriaBuilder) -> {
 
 			if (!com.storage.utils.StringUtils.isEmpty(name)) {
-				return criteriaBuilder.like(root.get("name"), "%" + name + "%");
+				return criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), "%" + name.toLowerCase() + "%");
 			} else
 				return null;
 
 		};
+	}
+	public static Specification<Product> hasOffer() {
+		return	(new Specification<Product>() {
+	
+				/**
+				 * 
+				 */
+				private static final long serialVersionUID = 7916776950787359285L;
+
+				@Override
+				public Predicate toPredicate(Root<Product> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
+					return criteriaBuilder.isNotNull(root.get("offer"));
+				}
+			});
+	
 	}
 
 	public static Specification<Product> idEqual(Integer id) {
@@ -117,6 +135,7 @@ public class ProductSpecification {
 		
 
 		return (root, query, criteriaBuilder) -> {
+			
 			CriteriaQuery<?> orderBy = query.orderBy(criteriaBuilder.desc(root.get("updateTime")));	
 			return null;
 		};

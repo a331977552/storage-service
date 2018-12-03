@@ -45,6 +45,10 @@ public class CustomerController  {
 	public Object getCustomerByName(@RequestParam() String name) {
 		return this.service.getCustomerByName(name);
 	}
+	@GetMapping("/createEmptyUser")
+	public Object createEmptyUser() {
+		return this.service.createEmptyUser();
+	}
 
 	/* (non-Javadoc)
 	 * @see com.storage.controller.ICustomerController#getCustomer(java.lang.String)
@@ -94,10 +98,16 @@ public class CustomerController  {
 		return this.service.count();
 	}
 	
-	@PostMapping("/customer/getCustomerByExample")
+	@PostMapping("/getCustomerByExample")
 	public Object getCustomerByExample(@RequestBody Customer customer) {
 		return this.service.getCustomerByExample(customer);
 	}
+
+	@GetMapping("/getbySession")
+	public Customer getCustomerBySessionid(@RequestParam String sessionId) {
+		return this.service.getCustomerBySessionid(sessionId);
+	}
+
 	@PostMapping("/login")
 	public Object login(@RequestBody Customer customer) {
 		return this.service.login(customer);

@@ -43,7 +43,9 @@ public class ApplicationStartupListener {
 			Setting setting=new Setting();
 			setting.setCurrencyRate(9.f);
 			setting.setCurrencyDisplay(POUND);
+			setting.setPhone("");
 			settingService.addSetting(setting);
+			
 		}
 		count = vatService.count();
 		if(count.getResult().longValue()==0) {

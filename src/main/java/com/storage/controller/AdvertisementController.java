@@ -1,17 +1,12 @@
 package com.storage.controller;
 
-import java.util.List;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.storage.entity.Advertisement;
 import com.storage.service.AdvertisementService;
-
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController()
 @RequestMapping("/ad")
@@ -41,7 +36,10 @@ public class AdvertisementController {
 		return service.findAdvertisementByPosition(direction);
 	}
 	
-	
+	@GetMapping("/getall")
+	public List<Advertisement> findAllAds(){
+		return service.findAllVisibleAds();
+	}
 	
 	
 	

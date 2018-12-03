@@ -1,18 +1,19 @@
 package com.storage.service.imp;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Example;
-import org.springframework.stereotype.Service;
-
 import com.storage.entity.Customer;
 import com.storage.entity.custom.StorageResult;
 import com.storage.repository.CustomerRepo;
 import com.storage.service.CustomerService;
 import com.storage.utils.StringUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Example;
+import org.springframework.stereotype.Service;
+
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @org.springframework.transaction.annotation.Transactional
@@ -24,22 +25,20 @@ public class CustomerServiceImp implements CustomerService {
 	public StorageResult addCustomer(Customer customer) {
 		if (customer == null)
 			return StorageResult.failed("invalid parameter");
-
-		// if has ID, then update
-		if (customer.getId() != null && customer.getId() > 0) {
-			customer.setUpdatetime(new Date());
-			customerRepo.save(customer);
-			return StorageResult.succeed(customer);
+		Customer example=new Customer();
+		example.setSessionId(customer.getSessionId());
+		Optional<Customer> one = customerRepo.findOne(Example.of(example));
+		if(one.isPresent())
+		{
+			example=one.get();
 		}
-
-		// null name, return failure
+			// if has ID, then update
 		if (StringUtils.isEmpty(customer.getName()))
 			return StorageResult.failed("customer name required");
 		if (StringUtils.isEmpty(customer.getEmail()))
 			return StorageResult.failed("customer email required");
 		if (StringUtils.isEmpty(customer.getPassword()))
 			return StorageResult.failed("customer password required");
-		// create customer
 		Customer probe=new Customer();
 		probe.setEmail(customer.getEmail());
 		long count = customerRepo.count(Example.of(probe));
@@ -49,9 +48,13 @@ public class CustomerServiceImp implements CustomerService {
 		customer.setUpdatetime(new Date());
 		customer.setCreatetime(new Date());
 		customer.setLanguage("zh");
-//		customer.setLanguage("en");
-		customerRepo.save(customer);
-		return StorageResult.succeed(customer);
+		customer.setIsEmpty(0);
+
+		BeanUtils.copyProperties(customer,example,"id");
+		Customer save = customerRepo.save(example);
+		return StorageResult.succeed(save);
+
+
 	}
 
 	@Override
@@ -69,7 +72,12 @@ public class CustomerServiceImp implements CustomerService {
 			one.setPostcode(customer.getPostcode());
 		if(!StringUtils.isEmpty(customer.getPhone()))
 			one.setPhone(customer.getPhone());
-		
+		if(!StringUtils.isEmpty(customer.getFirstName()))
+			one.setFirstName(customer.getFirstName());
+		if(!StringUtils.isEmpty(customer.getLastName()))
+			one.setLastName(customer.getLastName());
+		if(!StringUtils.isEmpty(customer.getLanguage()))
+			one.setLanguage(customer.getLanguage());
 		customerRepo.save(one);
 
 		return StorageResult.succeed();
@@ -92,7 +100,17 @@ public class CustomerServiceImp implements CustomerService {
 
 		return StorageResult.succeed(results);
 	}
+	@Override
+	public Customer createEmptyUser(){
+		Customer customer=new Customer();
+		customer.setIsEmpty(1);
+		customer.setSessionId(UUID.randomUUID().toString());
+		customer.setUpdatetime(new Date());
+		customer.setCreatetime(new Date());
+		customer.setLanguage("zh");
 
+		return customerRepo.save(customer);
+	}
 	@Override
 	public StorageResult getCustomerById(Integer id) {
 		if (id == null || id < 0)
@@ -124,8 +142,7 @@ public class CustomerServiceImp implements CustomerService {
 
 	@Override
 	public Object getCustomerList(String order) {
-		List<Customer> selectByExample = customerRepo.findAll();
-		return selectByExample;
+		return customerRepo.findAll();
 	}
 
 	@Override
@@ -143,8 +160,7 @@ public class CustomerServiceImp implements CustomerService {
 	@Override
 	public Object List() {
 
-		List<Customer> selectByExample = customerRepo.findAll();
-		return selectByExample;
+		return customerRepo.findAll();
 	}
 
 	@Override
@@ -164,6 +180,14 @@ public class CustomerServiceImp implements CustomerService {
 		if(results.isEmpty())
 			return StorageResult.failed("cannot find a match!");
 		return StorageResult.succeed(results.get(0));
+	}
+
+	@Override
+	public Customer getCustomerBySessionid(String sessionId) {
+		Customer customer=new Customer();
+		customer.setSessionId(sessionId);
+		Optional<Customer> one = customerRepo.findOne(Example.of(customer));
+		return one.orElse(null);
 	}
 
 }

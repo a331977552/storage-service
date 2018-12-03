@@ -1,16 +1,21 @@
 package com.storage.service.imp;
 
-import java.math.BigDecimal;
-import java.text.NumberFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Optional;
-
-import javax.annotation.Resource;
-import javax.persistence.EntityManager;
-
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.storage.entity.*;
+import com.storage.entity.custom.*;
+import com.storage.exception.NotSettingException;
+import com.storage.repository.CategoryRepo;
+import com.storage.repository.ProductDescRepo;
+import com.storage.repository.ProductImgRepo;
+import com.storage.repository.ProductRepo;
+import com.storage.repository.specification.ProductSpecification;
+import com.storage.service.ProductService;
+import com.storage.service.SellingRecordService;
+import com.storage.service.SettingService;
+import com.storage.utils.JsonUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.PropertySource;
@@ -24,37 +29,17 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
-import com.storage.entity.Category;
-import com.storage.entity.Product;
-import com.storage.entity.ProductDesc;
-import com.storage.entity.Productimg;
-import com.storage.entity.SellingRecord;
-import com.storage.entity.Setting;
-import com.storage.entity.custom.CustomOrder;
-import com.storage.entity.custom.CustomProduct;
-import com.storage.entity.custom.CustomeProductName;
-import com.storage.entity.custom.OrderWrap;
-import com.storage.entity.custom.PageBean;
-import com.storage.entity.custom.StorageResult;
-import com.storage.repository.CategoryRepo;
-import com.storage.repository.ProductDescRepo;
-import com.storage.repository.ProductImgRepo;
-import com.storage.repository.ProductRepo;
-import com.storage.repository.specification.ProductSpecification;
-import com.storage.service.ProductService;
-import com.storage.service.SellingRecordService;
-import com.storage.service.SettingService;
-import com.storage.utils.JsonUtils;
-
-import lombok.extern.slf4j.Slf4j;
+import javax.annotation.Resource;
+import javax.persistence.EntityManager;
+import java.math.BigDecimal;
+import java.text.NumberFormat;
+import java.util.*;
 
 @Service
 @PropertySource("classpath:myapp.properties")
 @Slf4j
 @org.springframework.transaction.annotation.Transactional
+
 public class ProductServiceImp implements ProductService {
 
 	
@@ -72,7 +57,7 @@ public class ProductServiceImp implements ProductService {
 	@Autowired
 	SettingService settingService;
 	@Autowired
-	SellingRecordService SellingRecordService;
+	SellingRecordService sellingRecordService;
 	@Autowired
 	CategoryRepo categoryRepo;
 	@Value("${seaweeddfs.url}")
@@ -149,49 +134,72 @@ public class ProductServiceImp implements ProductService {
 		if (id == null || id < 0)
 			return StorageResult.failed("invalid id");
 
-		CustomProduct customProduct = new CustomProduct();
 		Optional<Product> pro = this.productRepo.findById(id);
 		if (!pro.isPresent()) {
 			return StorageResult.failed("no such product");
 		}
 		Product product = pro.get();
-		manager.detach(product);
-		
-		product.setSellingprice_(product.getSellingprice());
-		product.setBuyingprice_(product.getBuyingprice());
-		Setting setting = settingService.getSetting().getResult();
-		
-		if(setting.getCurrencyDisplay()==1) {
-			product.setMoneyDisplayed("£"+product.getSellingprice_aftertax().toPlainString());			
-		}else {			
-			product.setMoneyDisplayed("¥"+(product.getSellingprice_aftertax().multiply(new BigDecimal(setting.getCurrencyRate()))).toPlainString());			
-			product.setSellingprice_aftertax(product.getSellingprice_aftertax().multiply(new BigDecimal(setting.getCurrencyRate())));
-		}
-		
-		
-		
-		customProduct.setProduct(product);
-		Productimg probe = new Productimg();
-		probe.setProdcutid(product.getId());
-		Example<Productimg> of = Example.of(probe);
-		List<Productimg> selectByExample = this.productimgRepo.findAll(of);
-		for (Productimg productimg : selectByExample) {
-			if (!productimg.getUrl().startsWith("http:"))
-				productimg.setUrl(seaweeddfsUrl + ":8080/" + productimg.getUrl());
-		}
-		ProductDesc desc = new ProductDesc();
-		desc.setProduct_id(product.getId());
-		Example<ProductDesc> of2 = Example.of(desc);
 
-		List<ProductDesc> findAll = productContentRepo.findAll(of2);
-		if (!findAll.isEmpty()) {
-			ProductDesc productDesc = findAll.get(0);
-			product.setContent(productDesc.getItemDesc());
-		}
-		customProduct.setImgs(selectByExample);
+
+		convertDisplayedCurrency(product);
+
+
+		List<Productimg> productImgs= getProductimgsById(product.getId());
+
+		ProductDesc desc= findProductDescribeById(product.getId());
+		product.setContent(desc.getItemDesc());
+		CustomProduct customProduct = new CustomProduct();
+		customProduct.setImgs(productImgs);
+		customProduct.setProduct(product);
 		return StorageResult.succeed(customProduct);
 	}
 
+	private ProductDesc findProductDescribeById(Integer id) {
+		ProductDesc desc = new ProductDesc();
+		desc.setProduct_id(id);
+		Example<ProductDesc> of2 = Example.of(desc);
+		Optional<ProductDesc> findAll = productContentRepo.findOne(of2);
+			return findAll.orElse(null);
+	}
+
+	private List<Productimg> getProductimgsById(int id){
+		Productimg probe = new Productimg();
+		probe.setProdcutid(id);
+		Example<Productimg> of = Example.of(probe);
+		List<Productimg> selectByExample = this.productimgRepo.findAll(of);
+		for (Productimg productimg : selectByExample) {
+			if (!productimg.getUrl().startsWith("http"))
+				productimg.setUrl(seaweeddfsUrl + ":8080/" + productimg.getUrl());
+		}
+		return selectByExample;
+	}
+	private  void convertDisplayedCurrency(Product product, Setting setting){
+		manager.detach(product);
+		product.setSellingprice_(product.getSellingprice());
+		product.setBuyingprice_(product.getBuyingprice());
+		if(setting==null)
+
+
+		if(setting.getCurrencyDisplay()==1) {
+			product.setMoneyDisplayed("£"+product.getSellingprice_aftertax().toPlainString());
+		}else {
+			product.setMoneyDisplayed("¥"+(product.getSellingprice_aftertax().multiply(new BigDecimal(setting.getCurrencyRate()))).toPlainString());
+			product.setSellingprice_aftertax(product.getSellingprice_aftertax().multiply(new BigDecimal(setting.getCurrencyRate())));
+		}
+	}
+	private  void convertDisplayedCurrency(Product product ){
+		Setting	setting = settingService.getSetting().getResult();
+		convertDisplayedCurrency(product,setting);
+	}
+	private void convertDisplayedCurrency(List<Product> products){
+		Setting setting=	settingService.getSetting().getResult();
+		for (Product product: products) {
+			convertDisplayedCurrency(product,setting);
+		}
+
+
+
+	}
 	@Override
 	public StorageResult updateProductSelective(Product product) {
 		if (product == null || product.getId() == null || product.getId() < 0)
@@ -342,15 +350,25 @@ public class ProductServiceImp implements ProductService {
 			results = this.productRepo.findAll(Example.of(example));
 		}
 		Iterator<Product> iterator = results.iterator();
+		manager.clear();
+		currencyProcess(iterator);
+
+		bean.setBeans(results);
+
+		return StorageResult.succeed(bean);
+
+	}
+
+	private void currencyProcess(Iterator<Product> iterator) {
 		StorageResult<Setting> settingresult = settingService.getSetting();
 		if(!settingresult.isSuccess())
 		{
 			log.error("cannot find setting ");
-			return StorageResult.failed("cannot find setting");
+			throw new NotSettingException("cannot find setting "); 
 		}
 		Setting setting = settingresult.getResult();
 		Float currencyRate = setting.getCurrencyRate();
-		manager.clear();
+	
 		while (iterator.hasNext()) {
 			Product product2 = iterator.next();
 			product2.setProduct_warning_quantity(this.product_warning_quantity);
@@ -376,11 +394,6 @@ public class ProductServiceImp implements ProductService {
 				}
 			}
 		}
-
-		bean.setBeans(results);
-
-		return StorageResult.succeed(bean);
-
 	}
 
 	@Override
@@ -470,8 +483,8 @@ public class ProductServiceImp implements ProductService {
 		pro.setBarcode(barcode);
 		Example<Product> of = Example.of(pro);
 
-		List<Product> selectByExample = this.productRepo.findAll(of);
-		if (selectByExample.size() == 0)
+		Optional<Product> selectByExample = this.productRepo.findOne(of);
+		if (!selectByExample.isPresent() )
 			return StorageResult.failed("didnot find the item");
 	
 		StorageResult<Setting> settingresult = settingService.getSetting();
@@ -482,7 +495,7 @@ public class ProductServiceImp implements ProductService {
 			return StorageResult.failed("cannot find setting");
 		}
 		Float currencyRate = settingresult.getResult().getCurrencyRate();
-		Product product2 = selectByExample.get(0);
+		Product product2 = selectByExample.get();
 		manager.detach(product2);
 		
 		Integer currencyDisplay = settingresult.getResult().getCurrencyDisplay();
@@ -555,9 +568,10 @@ public class ProductServiceImp implements ProductService {
 		this.productRepo.save(product);
 		ProductDesc probe = new ProductDesc();
 		probe.setProduct_id(product.getId());
-		List<ProductDesc> findAll2 = productContentRepo.findAll(Example.of(probe));
-		if (!findAll2.isEmpty()) {
-			ProductDesc productDesc = findAll2.get(0);
+		Optional<ProductDesc> findOne = productContentRepo.findOne(Example.of(probe));
+		
+		if (findOne.isPresent()) {
+			ProductDesc productDesc = findOne.get();
 			productDesc.setItemDesc(product.getContent());
 			productContentRepo.save(productDesc);
 		}
@@ -586,37 +600,28 @@ public class ProductServiceImp implements ProductService {
 		List<Product> list=new ArrayList<>();
 		
 		//get desired products according to the categoryid
-		List<SellingRecord> all = SellingRecordService.getAll();
+		List<SellingRecord> all = sellingRecordService.getAll(0,10);
 		for (SellingRecord sellingRecord : all) {
 			Product product = sellingRecord.getProduct();
 			if (product.getCategory()==categoryId && product.getStatus()==PRODUCT_NORNAL) {
 				list.add(product);
-			if(list.size()>=10)
-				break;
 			}
 			
 		}
 		//get best selling products that is not in the the productId
-		if(list.size()<10) {
-			for (SellingRecord sellingRecord : all) {
-				Product product = sellingRecord.getProduct();
-				if (product.getCategory()!=categoryId  && product.getStatus()==PRODUCT_NORNAL) {
-					list.add(product);
-				if(list.size()>=10)
-					break;
-				}				
-			}			
-		}
+		
 		//fill the list with new added products
 		if(list.size()<10) {
 			Product probe=new Product();
 			probe.setCategory(categoryId);
 			probe.setStatus(PRODUCT_NORNAL);
 			Sort ascending = Sort.by("createdtime").descending();
+			PageRequest of = PageRequest.of(0, 10, ascending);
 			
-			List<Product> findAll = productRepo.findAll(Example.of(probe),ascending);
-			for (Product product : findAll) {
-				list.add(product);
+			Page<Product> findAll = productRepo.findAll(Example.of(probe),of);
+			
+			for (Product product2: findAll) {
+				list.add(product2);
 				if(list.size()>=10)
 					break;
 				}				
@@ -629,5 +634,114 @@ public class ProductServiceImp implements ProductService {
 		throwable.printStackTrace();
 		return new ArrayList<Product>();
 	}
+
+	@Override
+	public StorageResult<PageBean<Product>> getProductByExample(Product product, Integer currentPage, Integer pageSize, String sort,
+			Integer categoryId, Integer offerConfirmed) {
+
+		if (pageSize == null) {
+			pageSize = this.pageSize;
+		}
+		if (currentPage == null)
+			currentPage = 0;
+		product.setCategory(categoryId);			
+
+		Specification<Product> and = Specification.where(ProductSpecification.idEqual(product.getId()))
+
+				.and(ProductSpecification.categoryEqual(product.getCategory()))
+				.and(ProductSpecification.createdtimeEqual(product.getCreatedtime()))
+				.and(ProductSpecification.nameLike(product.getName()))
+				.and(ProductSpecification.quantityEqual(product.getQuantity()))
+				.and(ProductSpecification.supplierEqual(product.getSupplier()))
+				.and(ProductSpecification.updatetimeEqual(product.getUpdatetime()))
+				.and(ProductSpecification.vatEqual(product.getId()))
+				.and(ProductSpecification.statueEqual(PRODUCT_NORNAL));
+
+		if (offerConfirmed != null && offerConfirmed == 1) {
+			and=	and.and(ProductSpecification.hasOffer());
+		}
+		long count = productRepo.count(and);
+
+		PageBean<Product> bean = new PageBean<>(currentPage, (int) count, pageSize);
+
+		pageSize = bean.getPageSize();
+		if(sort==null)
+			sort="";
+		switch (sort) {
+		case "lower-price":
+			sort = "sellingprice";
+			product.setSort_order("asc");
+			break;
+		case "high-price":
+			sort = "sellingprice";
+			product.setSort_order("desc");
+			break;
+		case "latest":
+			sort = "updatetime";
+			product.setSort_order("desc");
+			break;
+		case "oldest":
+			sort = "updatetime";
+			product.setSort_order("asc");
+			break;
+		default:
+			sort = "updatetime";
+			product.setSort_order("desc");
+		}
+
+		String sort_order = product.getSort_order();
+
+		org.springframework.data.domain.Sort.Order order;
+		if (sort_order.equals("desc")) {
+			order = org.springframework.data.domain.Sort.Order.desc(sort);
+		} else {
+			order = org.springframework.data.domain.Sort.Order.asc(sort);
+		}
+		PageRequest of = PageRequest.of(currentPage, pageSize, Sort.by(order));
+		Page<Product> findAll = productRepo.findAll(and, of);
+		List<Product> results = findAll.getContent();
+
+		if (results.size() == 0 && !com.storage.utils.StringUtils.isEmpty(product.getName())) {
+			Product example = new Product();
+			example.setBarcode(product.getName());
+			example.setStatus(PRODUCT_NORNAL);
+
+			results = this.productRepo.findAll(Example.of(example));
+		}
+		Iterator<Product> iterator = results.iterator();
+		manager.clear();
+		currencyProcess(iterator);
+		bean.setBeans(results);
+
+		return StorageResult.succeed(bean);
+
 	
+		
+	}
+
+	@Override
+	public List<CustomProduct> getProductByIds(List<Integer> ids) {
+		if (ids == null){
+			log.warn("getProductByIds:   ids ==null ");
+			return new ArrayList<>();
+		}
+
+		List<Product> products = this.productRepo.findAllById(ids);
+
+		convertDisplayedCurrency(products);
+		List<CustomProduct> customProducts=new ArrayList<>();
+		for (Product product: products) {
+			List<Productimg> productImgs= getProductimgsById(product.getId());
+			//ProductDesc desc= findProductDescribeById(product.getId());
+			//product.setContent(desc.getItemDesc());
+			CustomProduct customProduct = new CustomProduct();
+			customProduct.setImgs(productImgs);
+			customProduct.setProduct(product);
+
+			customProducts.add(customProduct);
+		}
+
+		return customProducts;
+	}
+
 }

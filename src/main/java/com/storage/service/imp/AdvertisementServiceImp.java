@@ -35,6 +35,7 @@ public class AdvertisementServiceImp implements AdvertisementService {
 			advertisement.setClickUrl(ad.getClickUrl());
 			advertisement.setImgUrl(ad.getImgUrl());
 			advertisement.setMessage(ad.getMessage());
+			advertisement.setHide(ad.getHide());
 			repo.save( advertisement);
 		}
 	}
@@ -53,5 +54,13 @@ public class AdvertisementServiceImp implements AdvertisementService {
 		
 		return findOne;
 	}
+
+	@Override
+	public List<Advertisement> findAllVisibleAds() {
+		Advertisement  advertisement=new Advertisement();
+		advertisement.setHide(0);
+		return repo.findAll(Example.of(advertisement));
+	}
+	
 
 }

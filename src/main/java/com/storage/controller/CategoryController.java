@@ -75,7 +75,6 @@ public class CategoryController {
 	@PostMapping("/updateAll")
 	public Object updateAllCategory(@RequestBody List<Category> categories) {
 	
-		System.out.println(categories);
 		return this.service.updateCategories(categories);
 	}
 	/* (non-Javadoc)

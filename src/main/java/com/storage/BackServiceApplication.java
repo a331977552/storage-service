@@ -11,10 +11,10 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 @EnableDiscoveryClient
 @SpringBootApplication
 @EnableCircuitBreaker
-public class WarehouseServiceApplication {
+public class BackServiceApplication {
 
 	public static void main(String[] args) {
-		  new SpringApplicationBuilder(WarehouseServiceApplication.class)
+		  new SpringApplicationBuilder(BackServiceApplication.class)
 		  
 		  .run(args);
 	}

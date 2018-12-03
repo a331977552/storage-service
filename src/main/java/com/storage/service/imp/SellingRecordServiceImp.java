@@ -5,6 +5,8 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Example;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
@@ -68,12 +70,13 @@ public class SellingRecordServiceImp implements SellingRecordService {
 	}
 
 	@Override
-	public List<SellingRecord> getAll() {
+	public List<SellingRecord> getAll(int page,int pageSize) {
 		
 		Sort sort=Sort.by("sellingAmount").descending();
-		List<SellingRecord> findAll = repo.findAll(sort);
-	
-		return findAll;
+		PageRequest of = PageRequest.of(page,pageSize,sort);
+		Page<SellingRecord> findAll = repo.findAll(of);
+		List<SellingRecord> content = findAll.getContent();
+		return content;
 	}
 
 }

@@ -1,30 +1,23 @@
 package com.storage.controller;
 
-import java.util.List;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.PropertySource;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.storage.entity.Category;
 import com.storage.entity.Product;
 import com.storage.entity.ProductDetail;
 import com.storage.entity.Vat;
 import com.storage.entity.custom.CustomOrder;
 import com.storage.entity.custom.CustomProduct;
+import com.storage.entity.custom.PageBean;
 import com.storage.entity.custom.StorageResult;
 import com.storage.service.CategoryService;
 import com.storage.service.ProductService;
 import com.storage.service.VatService;
 import com.storage.utils.JsonUtils;
 import com.storage.utils.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.PropertySource;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController()
 @RequestMapping("/product")
@@ -58,8 +51,9 @@ public class ProductController  {
 	@GetMapping("/get/{id}")
 	public Object getProduct(@PathVariable(name = "id") Integer id) {
 			StorageResult<CustomProduct> productById = this.service.getProductById(id);
-		
 			CustomProduct result =productById.getResult();
+			if(result==null)
+				return null;
 			ProductDetail model=new ProductDetail();
 			model.setProduct(result.getProduct());
 			model.setImgs(result.getImgs());
@@ -71,6 +65,13 @@ public class ProductController  {
 			model.setVats(vatByExample.getResult());
 			return model;
 	}
+	@PostMapping("/getListByIds")
+	public Object getProducts(@RequestBody  List<Integer> ids) {
+		List<CustomProduct> productById = this.service.getProductByIds(ids);
+
+		return productById;
+	}
+
 
 	/* (non-Javadoc)
 	 * @see com.storage.controller.IProductController#getProductByBarcode(java.lang.String, java.lang.Integer)
@@ -101,18 +102,18 @@ public class ProductController  {
 	 */
 	
 	@RequestMapping("/list")
+	public Object getProduct(@RequestBody Product product,Integer currentPage,Integer pageSize,
+			@RequestParam(value="sort",required=false)String sort,@RequestParam(value="categoryId",required=false)Integer categoryId
+			,@RequestParam(value="offerConfirmed",required=false)Integer offerConfirmed
+			) {
 
-	public Object getProduct(@RequestBody Product product,Integer currentPage,Integer pageSize) {
-
-		/*try {
-			Thread.sleep(3000);
-		} catch (InterruptedException e) {121311260004
-			e.printStackTrace();
-		}*/
-		product.setStatus(2);
-		StorageResult productByExample = this.service.getProductByExample(product,currentPage,pageSize);
+	
+		StorageResult<PageBean<Product>> productByExample = this.service.getProductByExample(product,currentPage,pageSize, sort, categoryId
+				, offerConfirmed);
 		return productByExample;
 	}
+
+	
 
 	/* (non-Javadoc)
 	 * @see com.storage.controller.IProductController#deleteProductById(java.lang.Integer)
