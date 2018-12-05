@@ -1,16 +1,14 @@
 package com.storage.repository.specification;
 
-import java.util.Date;
+import com.storage.entity.Product;
+import com.storage.utils.StringUtils;
+import org.springframework.data.jpa.domain.Specification;
 
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
-
-import org.springframework.data.jpa.domain.Specification;
-
-import com.storage.entity.Product;
-import com.storage.utils.StringUtils;
+import java.util.Date;
 
 public class ProductSpecification {
 
@@ -25,6 +23,15 @@ public class ProductSpecification {
 
 		};
 	}
+	public static Specification<Product> quantityLessThan(int quantity) {
+
+		return (root, query, criteriaBuilder) -> {
+
+				return criteriaBuilder.lessThan(root.get("quantity"),quantity);
+
+		};
+	}
+
 	public static Specification<Product> hasOffer() {
 		return	(new Specification<Product>() {
 	

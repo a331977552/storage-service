@@ -1,17 +1,4 @@
 package com.storage.service.imp;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
-
-import javax.annotation.Resource;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Example;
-import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.interceptor.TransactionAspectSupport;
-
 import com.storage.entity.Category;
 import com.storage.entity.Product;
 import com.storage.entity.custom.StorageResult;
@@ -20,6 +7,17 @@ import com.storage.repository.ProductRepo;
 import com.storage.service.CategoryService;
 import com.storage.service.ProductService;
 import com.storage.utils.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Example;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
+
+import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 
 @Service
@@ -150,12 +148,14 @@ public class CategoryServiceImp implements  CategoryService{
 	 * 
 	 */
 	@Override
-	public StorageResult updateCategories(List<Category> categories) {
-		List<Category> findAll = categoryRepo.findAll();
+	public StorageResult updateCategories(List<Category> categoriesFromWeb) {
+
+		List<Category> categoryExisting=getExistCategory(categoriesFromWeb);
+		List<Category> AllCateogry = categoryRepo.findAll();
 		List<Category> deletes=new ArrayList<>();
-		for (Category category : findAll) {
+		for (Category category : AllCateogry) {
 			boolean delete=true;
-			inner :for (Category cat : categories) {
+			inner :for (Category cat : categoryExisting) {
 				if(cat.getId()==category.getId()) {
 					delete=false;
 					break inner;
@@ -183,14 +183,66 @@ public class CategoryServiceImp implements  CategoryService{
 		}
 		
 		jedisPool.getOperations().expire(REDIS_CACHE, 0,TimeUnit.SECONDS);
-		List<Category> saveAll = categoryRepo.saveAll(categories);
+		categoriesFromWeb.removeAll(deletes);
+
+
+		saveChildren(categoriesFromWeb);
 		
-		return StorageResult.succeed(saveAll);
+		return StorageResult.succeed(categoryRepo.findAll());
+	}
+
+	private List<Category> getExistCategory(List<Category> categories) {
+		List<Category> categoryExisting=new ArrayList<>();
+		for (Category category : categories) {
+			Integer id = category.getId();
+
+			if(id!=null)
+				categoryExisting.add(category);
+
+		}
+			return categoryExisting;
 	}
 
 
+	private void saveChildren( List<Category> categories){
+
+		/**
+		 * make sure the process run from top( root parents) to bottom (children).
+		 */
+		for (Category child : categories) {
+			if (child.getStr_parents() == null) {
+				findAllChildren(child, categories);
+			}
+		}
+
+	}
+
+	private void findAllChildren(Category parent, List<Category> categories) {
+		List<Category> children=new ArrayList<>();
+
+		/**
+		 * find all the children
+		 */
+		for (Category category : categories) {
+			if(category.getStr_parents()!=null&&category.getStr_parents().equals(parent.getStr_id())){
+				children.add(category);
+			}
+		}
+		/**
+		 * save parents
+		 * set valid parent id to children
+		 */
+		Category ParentInDB = categoryRepo.save(parent);
+		for (Category child : children) {
+
+			child.setParent(ParentInDB.getId());
+			//save children
+			findAllChildren(child,categories);
+		}
 
 
+
+	}
 
 
 }

@@ -1,15 +1,11 @@
 package com.storage;
 
-import java.math.BigDecimal;
-import java.text.NumberFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-
+import com.storage.entity.Product;
+import com.storage.entity.Productimg;
+import com.storage.entity.custom.CustomProduct;
+import com.storage.entity.custom.StorageResult;
+import com.storage.service.ProductService;
+import com.storage.service.ProductimgService;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -17,19 +13,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
 
-import com.storage.entity.Product;
-import com.storage.entity.Productimg;
-import com.storage.entity.custom.CustomProduct;
-import com.storage.entity.custom.StorageResult;
-import com.storage.service.ProductService;
-import com.storage.service.ProductimgService;
+import java.math.BigDecimal;
+import java.text.NumberFormat;
+import java.util.*;
 
 
 
 @RunWith(SpringRunner.class)
 @SpringBootTest()
 
-public class AdTest {
+public class FakeDataInsertion {
 
 	String  productName=":name:\r\n" + 
 			":Pasta - Agnolotti - Butternut:\r\n" + 

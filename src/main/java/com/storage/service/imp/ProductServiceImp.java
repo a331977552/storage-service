@@ -514,10 +514,16 @@ public class ProductServiceImp implements ProductService {
 	public StorageResult getStockReminder() {
 
 		// criteria.andQuantityLessThanOrEqualTo(this.product_warning_quantity);
+		Specification<Product> and = Specification.where(ProductSpecification.quantityLessThan(product_warning_quantity))
+				.and(ProductSpecification.statueEqual(PRODUCT_NORNAL));
+		PageRequest of = PageRequest.of(0, 100);
 
-		List<Product> selectByExample = this.productRepo.findStockReminder(product_warning_quantity);
-
-		return StorageResult.succeed(selectByExample);
+		Page<Product> all = productRepo.findAll(and, of);
+		all.getTotalElements();
+		PageBean<Product> productPageBean=new PageBean<>();
+		productPageBean.setBeans(all.getContent());
+		productPageBean.setTotalCount((int)all.getTotalElements());
+		return StorageResult.succeed(productPageBean);
 	}
 
 	@Override
