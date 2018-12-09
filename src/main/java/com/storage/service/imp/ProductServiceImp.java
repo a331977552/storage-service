@@ -25,15 +25,15 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import javax.annotation.Resource;
 import javax.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.util.*;
+
+import static com.storage.entity.utils.Constants.REDIS_NAME_PRODUCT_NAMES_PREFIX;
 
 @Service
 @PropertySource("classpath:myapp.properties")
@@ -73,11 +73,7 @@ public class ProductServiceImp implements ProductService {
 	@Autowired
 	EntityManager manager;
 
-	/*
-	 * @Autowired JedisClientPool jedisPool;
-	 */
-	@Resource(name = "redisTemplate")
-	ValueOperations<String, String> opsForValue;
+
 
 	@Autowired
 	StringRedisTemplate redisTemplate;
@@ -120,13 +116,9 @@ public class ProductServiceImp implements ProductService {
 		one.setStatus(PRODUCT_DELETE);
 		one.setBarcode(one.getBarcode()+"_delete");
 		this.productRepo.save(one);
+		redisTemplate.delete(REDIS_NAME_PRODUCT_NAMES_PREFIX+one.getCategory());
+		redisTemplate.delete(REDIS_NAME_PRODUCT_NAMES_PREFIX+"-1");
 		return StorageResult.succeed();
-	}
-
-	@Override
-	public StorageResult getProductByExample(Product product) {
-		return this.getProductByExample(product, 0, this.pageSize);
-
 	}
 
 	@Override
@@ -288,7 +280,6 @@ public class ProductServiceImp implements ProductService {
 			Productimg productimg2 = one.get();
 			productimg2.setProdcutid(id);
 			productimgRepo.save(productimg2);
-
 		}
 		// save content
 
@@ -296,68 +287,11 @@ public class ProductServiceImp implements ProductService {
 		desc.setItemDesc(cusproduct.getProduct().getContent());
 		desc.setProduct_id(id);
 		productContentRepo.save(desc);
-
+		redisTemplate.delete(REDIS_NAME_PRODUCT_NAMES_PREFIX+product.getCategory());
+		redisTemplate.delete(REDIS_NAME_PRODUCT_NAMES_PREFIX+"-1");
 		return StorageResult.succeed(product);
 	}
 
-	@Override
-	public StorageResult getProductByExample(Product product, Integer currentPage, Integer pageSize) {
-
-		if (pageSize == null) {
-			pageSize = this.pageSize;
-		}
-
-		Specification<Product> and = Specification.where(ProductSpecification.idEqual(product.getId()))
-				
-				.and(ProductSpecification.categoryEqual(product.getCategory()))
-				.and(ProductSpecification.createdtimeEqual(product.getCreatedtime()))
-				.and(ProductSpecification.nameLike(product.getName()))
-				.and(ProductSpecification.quantityEqual(product.getQuantity()))
-				.and(ProductSpecification.supplierEqual(product.getSupplier()))
-				.and(ProductSpecification.updatetimeEqual(product.getUpdatetime()))
-				.and(ProductSpecification.vatEqual(product.getId()))
-				.and(ProductSpecification.statueEqual(PRODUCT_NORNAL));
-	
-		long count = productRepo.count(and);
-
-		and.and(ProductSpecification.orderByUpdateTime());
-		PageBean<Product> bean = new PageBean<>(currentPage, (int) count, pageSize);
-	
-		pageSize = bean.getPageSize();
-		String sort2 = product.getSort();
-		if(com.storage.utils.StringUtils.isEmpty(sort2))
-			sort2="updatetime";
-		String sort_order = product.getSort_order();
-		
-		if(com.storage.utils.StringUtils.isEmpty(sort_order))
-			sort_order="desc";
-		org.springframework.data.domain.Sort.Order order;
-			if(sort_order.equals("desc")) {
-				order= org.springframework.data.domain.Sort.Order.desc(sort2);				
-			}else {
-				order= org.springframework.data.domain.Sort.Order.asc(sort2);								
-			}
-		Sort sort=Sort.by(order);
-		PageRequest of = PageRequest.of(currentPage, pageSize,sort);
-		Page<Product> findAll = productRepo.findAll(and,of );
-		List<Product> results = findAll.getContent();
-
-		if (results.size() == 0 && !com.storage.utils.StringUtils.isEmpty(product.getName())) {
-			Product example = new Product();
-			example.setBarcode(product.getName());
-			example.setStatus(PRODUCT_NORNAL);
-
-			results = this.productRepo.findAll(Example.of(example));
-		}
-		Iterator<Product> iterator = results.iterator();
-		manager.clear();
-		currencyProcess(iterator);
-
-		bean.setBeans(results);
-
-		return StorageResult.succeed(bean);
-
-	}
 
 	private void currencyProcess(Iterator<Product> iterator) {
 		StorageResult<Setting> settingresult = settingService.getSetting();
@@ -398,8 +332,8 @@ public class ProductServiceImp implements ProductService {
 
 	@Override
 	public StorageResult getProductNamesByCategory(Integer categoryId) {
-		String string = opsForValue.get("productNameByCategory" + categoryId);
-		if (string != null) {
+		String string = redisTemplate.opsForValue().get( REDIS_NAME_PRODUCT_NAMES_PREFIX+ categoryId);
+		if (!com.storage.utils.StringUtils.isEmpty(string)) {
 			List<CustomeProductName> jsonToList = JsonUtils.jsonToList(string, CustomeProductName.class);
 			return StorageResult.succeed(jsonToList);
 		}
@@ -421,7 +355,7 @@ public class ProductServiceImp implements ProductService {
 		try {
 			String writeValueAsString = mapper.writeValueAsString(selectNameByExample);
 
-			opsForValue.set("productNameByCategory" + categoryId, writeValueAsString);
+			redisTemplate.opsForValue().set(REDIS_NAME_PRODUCT_NAMES_PREFIX + categoryId, writeValueAsString);
 		} catch (JsonProcessingException e) {
 			e.printStackTrace();
 		}
@@ -597,6 +531,9 @@ public class ProductServiceImp implements ProductService {
 				}
 			}
 		}
+
+		redisTemplate.delete(REDIS_NAME_PRODUCT_NAMES_PREFIX+"-1");
+		redisTemplate.delete(REDIS_NAME_PRODUCT_NAMES_PREFIX+product.getCategory());
 		return StorageResult.succeed(product);
 	}
 
@@ -642,15 +579,15 @@ public class ProductServiceImp implements ProductService {
 	}
 
 	@Override
-	public StorageResult<PageBean<Product>> getProductByExample(Product product, Integer currentPage, Integer pageSize, String sort,
-			Integer categoryId, Integer offerConfirmed) {
+	public StorageResult<PageBean<Product>> getProductByExample(Product product, Integer currentPage, Integer pageSize,
+			 Integer offerConfirmed) {
 
 		if (pageSize == null) {
 			pageSize = this.pageSize;
 		}
 		if (currentPage == null)
 			currentPage = 0;
-		product.setCategory(categoryId);			
+
 
 		Specification<Product> and = Specification.where(ProductSpecification.idEqual(product.getId()))
 
@@ -669,36 +606,42 @@ public class ProductServiceImp implements ProductService {
 		long count = productRepo.count(and);
 
 		PageBean<Product> bean = new PageBean<>(currentPage, (int) count, pageSize);
+		String sort = product.getSort();
 
 		pageSize = bean.getPageSize();
 		if(sort==null)
 			sort="";
 		switch (sort) {
-		case "lower-price":
+		case "price":
 			sort = "sellingprice";
-			product.setSort_order("asc");
 			break;
-		case "high-price":
-			sort = "sellingprice";
-			product.setSort_order("desc");
-			break;
-		case "latest":
+		case "time":
 			sort = "updatetime";
-			product.setSort_order("desc");
 			break;
-		case "oldest":
-			sort = "updatetime";
-			product.setSort_order("asc");
+		case "quantity":
+			sort = "quantity";
 			break;
+		case "createdtime":
+				sort = "createdtime";
+				break;
 		default:
 			sort = "updatetime";
-			product.setSort_order("desc");
+		}
+		String sort_order = product.getSort_order();
+		if(sort_order==null)
+			sort_order="desc";
+		if(!sort_order.equals("desc") && !sort_order.equals("asc")){
+			sort_order="desc";
 		}
 
-		String sort_order = product.getSort_order();
+
+		product.setSort_order(sort_order);
+
+
+		String sort_order2 = product.getSort_order();
 
 		org.springframework.data.domain.Sort.Order order;
-		if (sort_order.equals("desc")) {
+		if (sort_order2.equals("desc")) {
 			order = org.springframework.data.domain.Sort.Order.desc(sort);
 		} else {
 			order = org.springframework.data.domain.Sort.Order.asc(sort);

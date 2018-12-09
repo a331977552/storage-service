@@ -102,13 +102,14 @@ public class ProductController  {
 	 */
 	
 	@RequestMapping("/list")
-	public Object getProduct(@RequestBody Product product,Integer currentPage,Integer pageSize,
-			@RequestParam(value="sort",required=false)String sort,@RequestParam(value="categoryId",required=false)Integer categoryId
+	public Object getProduct(@RequestBody(required=false) Product product, @RequestParam(value="currentPage",required=false)Integer currentPage,
+							 @RequestParam(value="pageSize",required=false) Integer pageSize
 			,@RequestParam(value="offerConfirmed",required=false)Integer offerConfirmed
 			) {
 
-	
-		StorageResult<PageBean<Product>> productByExample = this.service.getProductByExample(product,currentPage,pageSize, sort, categoryId
+
+
+		StorageResult<PageBean<Product>> productByExample = this.service.getProductByExample(product,currentPage,pageSize
 				, offerConfirmed);
 		return productByExample;
 	}
